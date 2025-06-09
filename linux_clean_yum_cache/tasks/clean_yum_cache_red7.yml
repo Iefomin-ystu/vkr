@@ -1,0 +1,4 @@
+# Clean cache: RedOS 7.3
+- name: Clean cache - RedOS 7.3
+  ansible.builtin.dnf:
+    update_cache: true

@@ -1,0 +1,9 @@
+---
+# defaults file for linux_configure_lldp
+
+# @def
+#   name: linux_configure_lldp_package_manager
+#   type: str
+#   description: Имя пакетного менеджера
+# @def_end
+linux_configure_lldp_package_manager: auto

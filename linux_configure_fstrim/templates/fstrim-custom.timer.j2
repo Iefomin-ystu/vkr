@@ -1,0 +1,14 @@
+{{ linux__marker }}
+
+[Unit]
+Description=Discard unused blocks once a day
+Documentation=man:fstrim
+
+[Timer]
+OnCalendar={{ linux_configure_fstrim_schedule }}
+AccuracySec=1m
+Persistent=false
+Unit=fstrim.service
+
+[Install]
+WantedBy=multi-user.target

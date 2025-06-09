@@ -1,0 +1,9 @@
+{{ linux__marker }}
+
+# Настройки тегов ПО
+# Тег тенанта. sbis-ru/sbis-kz и т.д.
+export TENANT={{ linux_configure_shell_tenant }}
+# Тег окружения. По сути кластер мониторинга. dev/prod/mgmt итд
+export ENV={{ linux_configure_shell_env }}
+# Тег контура. none заменяем на dev/prod итд
+export STAGE={{ linux_configure_shell_stage }}

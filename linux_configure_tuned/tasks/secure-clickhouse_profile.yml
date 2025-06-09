@@ -1,0 +1,28 @@
+---
+# Добавление и конфигурация tuned профиля 'secure-clickhouse'
+
+# tuned: Установка профиля 'secure-dpc-vm', от которого зависит профиль 'secure-clickhouse'
+- name: "Include tasks - 'secure-dpc-vm_profile.yml'"
+  ansible.builtin.include_tasks:
+    file: "secure-dpc-vm_profile.yml"
+
+# tuned: Создание директории для будущего кастомного профиля tuned
+- name: "Tuned - Make directory for custom profile 'secure-clickhouse'"
+  ansible.builtin.file:
+    path: "/etc/tuned/secure-clickhouse"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+# tuned: Деплой кастомного профиля tuned
+- name: "Tuned - Deploy custom tuned profile 'secure-clickhouse'"
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: "secure-clickhouse.conf"
+    dest: "/etc/tuned/secure-clickhouse/tuned.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    force: true

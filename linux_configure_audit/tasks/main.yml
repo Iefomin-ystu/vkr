@@ -1,0 +1,49 @@
+---
+# tasks file for linux_configure_audit
+# Добавление конфигурации для auditd
+- name: Configure auditd - create audit config files
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: "{{ _audit_conf_file.src }}"
+    dest: "{{ _audit_conf_file.dest }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop:
+    - src: 10-dpc.rules
+      dest: /etc/audit/rules.d/10-dpc.rules
+    - src: vmware-tools.rules
+      dest: /etc/audit/rules.d/vmware-tools.rules
+    - src: sbis3mon.rules
+      dest: /etc/audit/rules.d/sbis3mon.rules
+  loop_control:
+    loop_var: _audit_conf_file
+    label: "{{ _audit_conf_file.dest }}"
+
+# Добавление параметров ядра для работы аудита
+# audit=1 - включение аудита
+# audit_backlog_limit=8192 - величина очереди событий, ожидающих отправки в audit daemon.
+#     События хранятся в оперативной памяти, 8192 события ~= 75 MiB
+- name: Configure auditd - enable audit in kernel arguments  # noqa no-changed-when
+  ansible.builtin.command: /usr/sbin/grubby --update-kernel=ALL --args='audit=1 audit_backlog_limit=8192'
+  register: __audit_enable_in_kernel
+  failed_when: __audit_enable_in_kernel.rc != 0
+
+# Перезапуск auditd с помощью /sbin/service
+# https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/security_hardening/auditing-the-system_security-hardening
+- name: Configure auditd - Restart auditd service
+  throttle: 10
+  timeout: 600
+  ansible.builtin.service:
+    name: auditd
+    state: restarted
+    use: service
+    enabled: true
+
+# Перезапуск сервера, если передан параметр audit_server_reboot == true
+- name: Configure auditd - Reboot server
+  when: audit_server_reboot is sameas true
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+    post_reboot_delay: 30

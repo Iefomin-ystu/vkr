@@ -1,0 +1,52 @@
+---
+- name: Linux_configure_shell - Install Starship package
+  throttle: 10
+  timeout: 600
+  ansible.builtin.package:
+    name: starship
+    state: present
+    use: "{{ linux_configure_shell_package_manager }}"
+    disable_gpg_check: true
+
+- name: Linux_configure_shell - Move starship.sh
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: starship.sh
+    dest: /etc/profile.d/starship.sh
+    mode: '0644'
+    owner: root
+
+- name: Linux_configure_shell - Create starship directory
+  ansible.builtin.file:
+    path: /etc/starship
+    state: directory
+    mode: '0755'
+    owner: root
+
+- name: Linux_configure_shell - Move starship.toml
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: starship.toml.j2
+    dest: /etc/starship/starship.toml
+    mode: '0644'
+    owner: root
+
+- name: Linux_configure_shell - Move cmdb-env.sh
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: cmdb-env.sh.j2
+    dest: "/etc/profile.d/cmdb-env.sh"
+    mode: '0644'
+    owner: root
+
+- name: Linux_configure_shell - Move history-mod.sh
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: history-mod.sh.j2
+    dest: "/etc/profile.d/history-mod.sh"
+    mode: '0644'
+    owner: root

@@ -1,0 +1,83 @@
+{{ linux__marker }}
+
+format = """
+$username\
+$hostname($localip)\
+$line_break\
+$env_var\
+$line_break\
+$directory \
+$character
+"""
+palette = "catppuccin_mocha"
+add_newline = true
+
+[username]
+format = '[$user]($style)@'
+style_user = 'bold yellow'
+style_root = 'bold red'
+
+[hostname]
+disabled = false
+format = '[$hostname](bold green)'
+trim_at = ''
+ssh_only = false
+ssh_symbol = ''
+
+[localip]
+disabled = false
+format = ' \([$localipv4](bold flamingo)\)'
+ssh_only = false
+
+[directory]
+format = '\[[$path]($style)[$read_only]($read_only_style)\]'
+
+[env_var.TENANT]
+format = '[$env_value](bold yellow)'
+
+[env_var.ENV]
+{% if linux_configure_shell_env == 'prod' %}
+format = ' / [$env_value](bold red)'
+{% else %}
+format = ' / [$env_value](bold green)'
+{% endif %}
+
+[env_var.STAGE]
+format = ' / [$env_value](bold flamingo)'
+
+#[env_var.PRODUCT]
+#format = '\[[$env_value](bold cyan)\]'
+
+# Replace the '❯' symbol in the prompt with '─>'
+[character] # The name of the module we are configuring is 'character'
+success_symbol = '[>](bold green)' # The 'success_symbol' segment is being set to '➜' with the color 'bold green'
+error_symbol = '[X](bold red)'
+
+[palettes.catppuccin_mocha]
+rosewater = "#f5e0dc"
+flamingo = "#f2cdcd"
+pink = "#f5c2e7"
+mauve = "#cba6f7"
+red = "#f38ba8"
+maroon = "#eba0ac"
+peach = "#fab387"
+yellow = "#f9e2af"
+green = "#a6e3a1"
+teal = "#94e2d5"
+sky = "#89dceb"
+sapphire = "#74c7ec"
+blue = "#89b4fa"
+lavender = "#b4befe"
+text = "#cdd6f4"
+subtext1 = "#bac2de"
+subtext0 = "#a6adc8"
+overlay2 = "#9399b2"
+overlay1 = "#7f849c"
+overlay0 = "#6c7086"
+surface2 = "#585b70"
+surface1 = "#45475a"
+surface0 = "#313244"
+base = "#1e1e2e"
+mantle = "#181825"
+crust = "#11111b"
+

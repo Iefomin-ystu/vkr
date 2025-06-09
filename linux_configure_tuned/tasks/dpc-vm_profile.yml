@@ -1,0 +1,23 @@
+---
+# Добавление и конфигурация tuned профиля 'dpc-vm'
+
+# tuned: Создание директории для будущего кастомного профиля tuned
+- name: "Tuned - Make directory for custom profile 'dpc-vm'"
+  ansible.builtin.file:
+    path: "/etc/tuned/dpc-vm"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+# tuned: Деплой кастомного профиля tuned
+- name: "Tuned - Deploy custom tuned profile 'dpc-vm'"
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: "dpc-vm.conf"
+    dest: "/etc/tuned/dpc-vm/tuned.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    force: true

@@ -1,0 +1,13 @@
+# ======================= #
+#                         #
+# ! STOP ! STOP ! STOP !  #
+#     Managed by AWX:     #
+# tensor.linux collection #
+#                         #
+# ======================= #
+
+# Добавлено по задаче: https://online.sbis.ru/opendoc.html?guid=c1ca2825-4c56-46ea-9a13-184be8687829
+
+####### Исключения #######
+# Не мониторим активность sbis3mon
+-a never,exclude -F auid=1245000085

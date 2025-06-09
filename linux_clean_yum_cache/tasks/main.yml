@@ -1,0 +1,31 @@
+---
+# tasks file for linux_clean_yum_cache
+# linux: Cбор фактов по серверу
+- name: Get facts
+  ansible.builtin.setup:
+    gather_timeout: 30
+  delegate_facts: true
+  become: true
+  register: vm_facts
+
+# linux: Имя операционной системы
+# vm_facts.ansible_facts.ansible_distribution == "RedHat"
+- name: OS - Set distribution name
+  ansible.builtin.set_fact:
+    os_distrib_name: "{{ vm_facts.ansible_facts.ansible_distribution | lower }}"
+
+# linux: Мажорная версия операционной системы
+# vm_facts.ansible_facts.ansible_distribution_major_version == "7"
+- name: OS - Set distribution major version
+  ansible.builtin.set_fact:
+    os_distrib_ver: "{{ vm_facts.ansible_facts.ansible_distribution_major_version }}"
+
+# linux: Формирование переменной для выбора сценария
+- name: Set variable 'os_major'
+  ansible.builtin.set_fact:
+    os_major: "{{ os_distrib_name }}{{ os_distrib_ver }}"
+
+# Загрузка нужного сценария
+- name: Include "clean_cache_{{ os_major }}.yml"
+  ansible.builtin.include_tasks:
+    file: "clean_yum_cache_{{ os_major }}.yml"

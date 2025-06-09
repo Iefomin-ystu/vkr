@@ -1,0 +1,13 @@
+---
+
+- name: Step 1 - Add/Delete yum repo
+  ansible.builtin.yum_repository:
+    name: "{{ linux_configure_repo_name }}"
+    description: "{{ linux_configure_repo_name }}"
+    file: "{{ linux_configure_repo_name }}"
+    baseurl: "{{ linux_configure_repo_baseurl }}"
+    enabled: "{{ linux_configure_repo_enabled }}"
+    gpgcheck: "{{ linux_configure_repo_gpgcheck }}"
+    repo_gpgcheck: "{{ linux_configure_repo_gpgcheck_repo }}"
+    gpgkey: "{{ linux_configure_repo_gpgkey }}"
+    metadata_expire: "{{ linux_configure_repo_metadata_expire }}"

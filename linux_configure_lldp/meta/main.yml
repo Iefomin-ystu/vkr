@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: linux_configure_lldp
+  author: I.E. Fomin <ie.fomin@tensor.ru>
+  description: Роль для установки lldp и его настройки на сетевых интерфейсах хоста
+  company: Tensor Company Ltd.
+  license: GPL-2.0-or-later
+
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - "7"
+        - "8"
+        - "9"

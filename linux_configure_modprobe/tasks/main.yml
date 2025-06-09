@@ -1,0 +1,42 @@
+---
+# tasks file for linux_configure_modprobe
+# Добавление модулей в blacklist'ы
+- name: Configure modprobe - Blacklist modules
+  community.general.kernel_blacklist:
+    blacklist_file: "/etc/modprobe.d/blacklist-{{ _modprobe_blacklist_module_name }}.conf"
+    name: "{{ _modprobe_blacklist_module_name }}"
+    state: present
+  loop: "{{ modprobe_blacklist_modules_list }}"
+  loop_control:
+    loop_var: _modprobe_blacklist_module_name
+    label: "{{ _modprobe_blacklist_module_name }}"
+  register: __modprobe_blacklist_result
+
+# Удаление модулей из kernel
+- name: Configure modprobe - Remove modules from kernel
+  community.general.modprobe:
+    name: "{{ _modprobe_disable_module_name }}"
+    state: absent
+  loop: "{{ modprobe_blacklist_modules_list }}"
+  loop_control:
+    loop_var: _modprobe_disable_module_name
+    label: "{{ _modprobe_disable_module_name }}"
+  register: __modprobe_disable_result
+
+# Пересборка dracut, если передан параметр modprobe_dracut_regenerate
+- name: Configure modprobe - Dracut regenerate
+  when:
+    - modprobe_dracut_regenerate is sameas true
+    - __modprobe_blacklist_result.changed is sameas true or
+      __modprobe_disable_result.changed is sameas true
+  ansible.builtin.command: /usr/bin/dracut --force --regenerate-all
+  register: __modprobe_dracut_regen
+  changed_when: "__modprobe_dracut_regen.rc == 0"
+  failed_when: __modprobe_dracut_regen.rc != 0
+
+# Перезапуск сервера, если передан параметр modprobe_server_reboot == true
+- name: Configure modprobe - Reboot server
+  when: modprobe_server_reboot is sameas true
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+    post_reboot_delay: 30

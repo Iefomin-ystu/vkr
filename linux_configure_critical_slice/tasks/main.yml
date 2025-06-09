@@ -1,0 +1,117 @@
+---
+# tasks file for linux_configure_critical_slice
+# Получение текущих рабочих сервисов. Необходимо в будущем для проверки наличия telegraf
+- name: Configure systemd - Get systemd services
+  throttle: 10
+  timeout: 600
+  ansible.builtin.service_facts:
+  register: __systemd_service_facts
+
+# Ex:
+# __systemd_service_facts: {
+#     ansible_facts: {
+#         services: {
+#             "systemd-journald.service": {
+#                 "name": "systemd-journald.service",
+#                 "source": "systemd",
+#                 "state": "running",
+#                 "status": "static"
+#             },
+#             "autofs.service": {
+#                 "name": "autofs.service",
+#                 "source": "systemd",
+#                 "state": "stopped",
+#                 "status": "disabled"
+#             },
+#             ...
+#         }
+#     }
+# }
+# Формирование списка имен systemd сервисов
+- name: Configure systemd - Get list of systemd service names
+  ansible.builtin.set_fact:
+    _systemd_service_names_list: "{{ __systemd_service_facts.ansible_facts.services.values() | map(attribute='name') | list }}"
+
+# Создание директории для systemd slice'а для критичных сервисов
+- name: Configure systemd - Create hostcritical.slice directory
+  throttle: 10
+  timeout: 600
+  ansible.builtin.file:
+    path: /etc/systemd/system/hostcritical.slice.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+# Добавление systemd slice для критичных сервисов
+- name: Configure systemd - Add hostcritical.slice
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: hostcritical.slice.conf
+    dest: /etc/systemd/system/hostcritical.slice.d/hostcritical.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+# Создание директорий для настроек критичных systemd сервисов
+- name: Configure systemd - Create config directories for critical systemd services
+  throttle: 10
+  timeout: 600
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ _systemd_critical_service_dir }}.service.d"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: "{{ systemd__critical_services }}"
+  loop_control:
+    loop_var: _systemd_critical_service_dir
+    label: "/etc/systemd/system/{{ _systemd_critical_service_dir }}.service.d"
+
+# Включение критичных сервисов в hostcritical.slice
+- name: Configure systemd - Add critical services to hostcritical.slice
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: service.conf
+    dest: "/etc/systemd/system/{{ _systemd_critical_service_dir }}.service.d/hostcritical.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ systemd__critical_services }}"
+  loop_control:
+    loop_var: _systemd_critical_service_dir
+    label: "{{ _systemd_critical_service_dir }}.service"
+
+# Перезапуск сконфигурированных сервисов
+# Исключение auditd из списка перезагружаемых сервисов необходимо,
+#   так как auditd перезагружается либо через /sbin/service, либо при перезагрузке сервера
+# Исключение telegraf необходимо, так как в случае отсутствия telegraf на сервере задача упадет с ошибкой
+- name: Configure systemd - Restart critical services
+  throttle: 10
+  timeout: 600
+  ansible.builtin.systemd:
+    name: "{{ _systemd_critical_service_name }}"
+    state: restarted
+    enabled: true
+  loop: "{{ systemd__critical_services | difference(['auditd', 'telegraf']) }}"
+  loop_control:
+    loop_var: _systemd_critical_service_name
+    label: "{{ _systemd_critical_service_name }}.service"
+
+# Перезапуск telegraf, если он установлен
+- name: Configure systemd - Restart telegraf
+  when: "'telegraf.service' in _systemd_service_names_list"
+  throttle: 10
+  timeout: 600
+  ansible.builtin.systemd:
+    name: telegraf
+    state: restarted
+
+# Перезапуск сервера, если передан параметр systemd_server_reboot == true
+- name: Configure systemd - Reboot server
+  when: systemd_server_reboot is sameas true
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+    post_reboot_delay: 30

@@ -1,0 +1,28 @@
+---
+# Добавление и конфигурация tuned профиля 'clickhouse'
+
+# tuned: Установка профиля 'dpc-vm', от которого зависит профиль 'clickhouse'
+- name: "Include tasks - 'dpc-vm_profile.yml'"
+  ansible.builtin.include_tasks:
+    file: "dpc-vm_profile.yml"
+
+# tuned: Создание директории для будущего кастомного профиля tuned
+- name: "Tuned - Make directory for custom profile 'clickhouse'"
+  ansible.builtin.file:
+    path: "/etc/tuned/clickhouse"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+# tuned: Деплой кастомного профиля tuned
+- name: "Tuned - Deploy custom tuned profile 'clickhouse'"
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: "clickhouse.conf"
+    dest: "/etc/tuned/clickhouse/tuned.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    force: true

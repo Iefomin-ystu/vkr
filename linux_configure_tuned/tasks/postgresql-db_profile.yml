@@ -1,0 +1,28 @@
+---
+# Добавление и конфигурация tuned профиля 'postgresql-db'
+
+# tuned: Установка профиля 'dpc-vm', от которого зависит профиль 'postgresql-db'
+- name: "Include tasks - 'dpc-vm_profile.yml'"
+  ansible.builtin.include_tasks:
+    file: "dpc-vm_profile.yml"
+
+# tuned: Создание директории для будущего кастомного профиля tuned
+- name: "Tuned - Make directory for custom profile 'postgresql-db'"
+  ansible.builtin.file:
+    path: "/etc/tuned/postgresql-db"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+
+# tuned: Деплой кастомного профиля tuned
+- name: "Tuned - Deploy custom tuned profile 'postgresql-db'"
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: "postgresql-db.conf"
+    dest: "/etc/tuned/postgresql-db/tuned.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    force: true

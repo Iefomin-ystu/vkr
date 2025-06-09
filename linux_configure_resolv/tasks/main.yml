@@ -1,0 +1,174 @@
+---
+# tasks file for linux_configure_resolv
+ # 1. Сбор фактов хостов
+- name: Step 1 - Gather specified facts
+  ansible.builtin.setup:
+    gather_timeout: 30
+    gather_subset:
+      - '!all'
+      - '!min'
+      - 'distribution_major_version'
+      - 'architecture'
+    filter:
+      - ansible_distribution
+      - ansible_distribution_major_version
+  register: __linux_configure_resolv_host_facts
+
+# 2. Создание переменных под название дистрибутива и его версии
+- name: Step 2 - Set OS distrib and version vars
+  ansible.builtin.set_fact:
+    __linux_configure_resolv_host_OS_name: "{{ __linux_configure_resolv_host_facts['ansible_facts']['ansible_distribution'] }}"
+    __linux_configure_resolv_host_OS_version: "{{ __linux_configure_resolv_host_facts['ansible_facts']['ansible_distribution_major_version'] }}"
+
+# 3. Проверяем есть ли данный хост в словаре доступных дистрибутивов
+- name: Step 3 - Check is OS supported
+  when: (
+    __linux_configure_resolv_host_OS_name not in linux_configure_resolv__os or
+    __linux_configure_resolv_host_OS_version not in linux_configure_resolv__os[__linux_configure_resolv_host_OS_name]
+    )
+  ansible.builtin.fail:
+    msg: >
+      {% if __linux_configure_resolv_host_OS_name not in linux_configure_resolv__os %}
+        {{ __linux_configure_resolv_host_OS_name }} distributive is not supported
+      {% else %}
+        {{ __linux_configure_resolv_host_OS_name }} {{ __linux_configure_resolv_host_OS_version }} is not supported
+      {% endif %}
+
+# 4. Установка NetworkManager и NSCD
+- name: Step 4 - Install NetworkManager and NSCD
+  ansible.builtin.package:
+    name:
+      - NetworkManager
+      - nscd
+    state: present
+
+# 5. Замена конфига NetworkManager, создание backup прошлого конфига
+- name: Step 5 - Replace NetworkManager.conf
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: "redhat_9/NetworkManager.conf.j2"
+    dest: "/etc/NetworkManager/NetworkManager.conf"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: __linux_configure_resolv_NM_result
+
+# 6. Замена конфига nscd.conf, создание backup прошлого конфига
+- name: Step 6 - Replace nscd.conf
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: "redhat_9/nscd.conf.j2"
+    dest: "/etc/nscd.conf"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: __linux_configure_resolv_nscd_result
+
+# 7. Замена конфига nsswitch.conf, создание backup прошлого конфига
+- name: Step 7 - Replace nsswitch.conf
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: "redhat_9/nsswitch.conf.j2"
+    dest: "/etc/nsswitch.conf"
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: __linux_configure_resolv_nsswitch_result
+
+# 8. Применение изменений NetworkManager
+- name: Step 8 - Apply new NetworkManager.conf
+  block:
+    - name: Step 8.1 - Restart NetworkManager
+      throttle: 10
+      timeout: 600
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: restarted
+  rescue:
+    - name: Step 8.2 - Return old NetworkManager.conf
+      throttle: 10
+      timeout: 600
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ __linux_configure_resolv_NM_result['backup_file'] }}"
+        dest: /etc/NetworkManager/NetworkManager.conf
+        mode: '0644'
+  # 8.2 Удаляем бэкап старого конфига
+    - name: Step 8.3 - Delete old NetworkManager.conf backup
+      ansible.builtin.file:
+        path: "{{ __linux_configure_resolv_NM_result['backup_file'] }}"
+        state: absent
+  # 8.3 Перезапуск NetworkManager
+    - name: Step 8.4 - Restart NetworkManager
+      timeout: 10
+      throttle: 600
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: restarted
+
+# 9. Автозагрузка NetworkManager
+- name: Step 9 - Enable NetworkManager
+  timeout: 10
+  throttle: 600
+  ansible.builtin.systemd:
+    name: NetworkManager
+    enabled: true
+
+# 9. Применение изменений NSCD
+- name: Step 9 - Apply new nscd.conf
+  block:
+  # 9.1 Применение изменений NSCD
+    - name: Step 9.1 - Restart NSCD
+      throttle: 10
+      timeout: 600
+      ansible.builtin.systemd:
+        name: nscd
+        state: restarted
+  rescue:
+  # 9.2 Восстанавливаем старый nscd.conf
+    - name: Step 9.2 - Return old nscd.conf
+      throttle: 10
+      timeout: 600
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ __linux_configure_resolv_nscd_result['backup_file'] }}"
+        dest: /etc/nscd.conf
+        mode: '0644'
+  # 9.3 Удаляем бэкап старого конфига NSCD
+    - name: Step 9.3 - Delete old nscd.conf backup
+      ansible.builtin.file:
+        path: "{{ __linux_configure_resolv_nscd_result['backup_file'] }}"
+        state: absent
+  # 9.4 Перезапуск NSCD
+    - name: Step 9.4 - Restart NSCD
+      timeout: 10
+      throttle: 600
+      ansible.builtin.systemd:
+        name: nscd
+        state: restarted
+
+# 10. Старт и автозагрузка NSCD
+- name: Step 10 - Enable NSCD
+  timeout: 10
+  throttle: 600
+  ansible.builtin.systemd:
+    name: nscd
+    enabled: true
+
+- name: Step 11 - Change resolv.conf
+  timeout: 10
+  throttle: 600
+  ansible.builtin.template:
+    src: redhat_9/resolv.conf.j2
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  register: __linux_configure_resolv_resolv_result

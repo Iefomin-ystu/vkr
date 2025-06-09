@@ -1,0 +1,59 @@
+---
+# tasks file for linux_configure_tuned
+# tuned: Установка дефолтного профиля, если профиль не указан
+- name: Set variable 'linux_tuned_profile' from defaults
+  ansible.builtin.set_fact:
+    linux_tuned_profile: "{{ _def_linux_tuned_profile }}"
+  when: linux_tuned_profile is not defined
+
+# tuned: Проверка корректности названия профиля tuned
+- name: Assert that tuned profile is supported
+  ansible.builtin.assert:
+    that:
+      - linux_tuned_profile in _def_default_tuned_profiles_list
+        or
+        linux_tuned_profile in _def_custom_tuned_profiles_list
+    fail_msg: >
+      "tuned profile '{{ linux_tuned_profile }}' is not in list of supported profiles -
+      {{ _def_default_tuned_profiles_list + _def_custom_tuned_profiles_list }}"
+
+# tuned: Установка tuned
+- name: Tuned - Ensure that tuned is installed
+  ansible.builtin.yum:
+    name: tuned
+    state: installed
+
+# tuned: Запуск и добавление в автозагрузку tuned
+- name: Tuned - Start and enable tuned
+  ansible.builtin.systemd:
+    name: "tuned"
+    state: started
+    enabled: true
+    daemon_reload: true
+
+# tuned: Получение текущего активного профиля
+- name: Tuned - Get active profile
+  ansible.builtin.command: /usr/sbin/tuned-adm active
+  register: get_tuned_profile_result
+  changed_when: false
+  failed_when: get_tuned_profile_result.rc != 0
+
+# get_tuned_profile_result.stdout - "Preset profile: virtual-guest"
+# current_tuned_profile - "virtual-guest"
+- name: Set variable 'current_tuned_profile'
+  ansible.builtin.set_fact:
+    current_tuned_profile: "{{ get_tuned_profile_result.stdout.split(':')[1] | trim }}"
+
+# tuned: Установка кастомных профилей tuned
+- name: "Include tasks - '{{ linux_tuned_profile }}.yml'"
+  ansible.builtin.include_tasks:
+    file: "{{ linux_tuned_profile }}_profile.yml"
+  when:
+    - linux_tuned_profile in _def_custom_tuned_profiles_list
+
+# tuned: Активация нужного профиля
+- name: "Tuned - Change active tuned profile to '{{ linux_tuned_profile }}'"
+  ansible.builtin.command: "/usr/sbin/tuned-adm profile {{ linux_tuned_profile }}"
+  register: apply_tuned_profile_result
+  changed_when: linux_tuned_profile != current_tuned_profile
+  failed_when: apply_tuned_profile_result.rc != 0

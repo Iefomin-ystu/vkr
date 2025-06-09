@@ -1,0 +1,20 @@
+---
+# tasks file for linux_configure_fstrim
+- name: Step 1 - Copy template to /etc/systemd/system
+  throttle: 600
+  timeout: 10
+  ansible.builtin.template:
+    src: fstrim-custom.timer.j2
+    dest: /etc/systemd/system/fstrim-custom.timer
+    mode: "0644"
+    owner: root
+    group: root
+
+- name: Step 2 - Start and Enable fstrim.timer
+  throttle: 600
+  timeout: 10
+  ansible.builtin.systemd:
+    name: fstrim-custom.timer
+    state: started
+    enabled: true
+    daemon_reload: true

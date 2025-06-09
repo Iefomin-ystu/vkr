@@ -1,0 +1,4 @@
+# Clean cache: centos/redhat 7
+- name: Clean cache - centos/redhat 7
+  ansible.builtin.yum:
+    update_cache: true

@@ -1,0 +1,216 @@
+# ======================= #
+#                         #
+# ! STOP ! STOP ! STOP !  #
+#     Managed by AWX:     #
+# tensor.linux collection #
+#                         #
+# ======================= #
+
+# Добавлено по задаче: https://online.sbis.ru/opendoc.html?guid=c80bf5b6-84b9-41ec-8a3a-5de4cbe31435
+
+####### Правила #######
+# Отслеживание использования sysctl
+-w /etc/sysctl.conf -p wa -k sysctl
+-w /etc/sysctl.d -p wa -k sysctl
+
+# Отслеживание конфигурации планировщиков заданий
+-w /etc/cron.allow -p wa -k crond
+-w /etc/cron.deny -p wa -k crond
+-w /etc/cron.d/ -p wa -k crond
+-w /etc/cron.daily/ -p wa -k crond
+-w /etc/cron.hourly/ -p wa -k crond
+-w /etc/cron.monthly/ -p wa -k crond
+-w /etc/cron.weekly/ -p wa -k crond
+-w /etc/crontab -p wa -k crond
+-w /var/spool/cron/crontabs/ -k crond
+-w /etc/inittab -p wa -k crond
+-w /etc/init.d/ -p wa -k crond
+-w /etc/init/ -p wa -k crond
+-w /etc/at.allow -p wa -k crond
+-w /etc/at.deny -p wa -k crond
+-w /var/spool/at/ -p wa -k crond
+-w /etc/anacrontab -p wa -k crond
+
+# Отслеживание конфигурации systemd
+-w /etc/systemd -p wa -k systemd_conf
+
+# Отслеживание доступа к файлам настроек sudo
+-w /etc/sudoers -p wa -k scope
+-w /etc/sudoers.d -p wa -k scope
+
+# Отслеживание изменений файла /var/log/sudo.log
+-w /var/log/sudo.log -p wa -k sudo_log_file
+
+# Отслеживание попыток чтения из audit-лога
+-w /var/log/audit/ -k auditlog
+
+# Отслеживание модификации настроек audit
+-w /etc/audit/ -p wa -k auditconfig
+-w /etc/libaudit.conf -p wa -k auditconfig
+-w /etc/audisp/ -p wa -k audispconfig
+
+# Отслеживание использования инструментов управления сервиса audit
+-w /sbin/auditctl -p x -k audittools
+-w /sbin/auditd -p x -k audittools
+
+# Отслеживание изменения параметров даты и времени в системе
+-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time_change
+-a always,exit -F arch=b32 -S adjtimex,settimeofday,clock_settime -k time_change
+-w /etc/localtime -p wa -k time_change
+
+# Отслеживание изменений файлов с настройками сетевого окружения, а так же подобных системных вызовов
+-a always,exit -F arch=b64 -S sethostname,setdomainname -k system_locale
+-a always,exit -F arch=b32 -S sethostname,setdomainname -k system_locale
+-w /etc/issue -p wa -k system_locale
+-w /etc/issue.net -p wa -k system_locale
+-w /etc/hosts -p wa -k system_locale
+-w /etc/sysconfig/network -p wa -k system_locale
+-w /etc/sysconfig/network-scripts/ -p wa -k system_locale
+
+# Отслеживание изменений CA, RPM и PKI
+-w /etc/pki/ca-trust/source/anchors/ -p wa -k pki_config
+-w /etc/pki/rpm-gpg/ -p wa -k pki_config
+
+# Отслеживание изменений GRUB
+-w /etc/grub.d/ -p wa -k grub_config
+-w /boot/grub2/grub.cfg -p wa -k grub_config
+
+
+# Отслеживание активности привелегированных программ с установленными битами setuid/setguid
+-a always,exit -F path=/usr/bin/chage -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/crontab -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/fusermount -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/gpasswd -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/ksu -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/mount -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/newgrp -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/passwd -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/pkexec -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/sudo -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/su -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/umount -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/bin/write -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/libexec/openssh/ssh-keysign -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/libexec/sssd/krb5_child -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/libexec/sssd/ldap_child -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/libexec/sssd/proxy_child -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/libexec/sssd/selinux_child -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/libexec/utempter/utempter -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/lib/polkit-1/polkit-agent-helper-1 -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/grub2-set-bootflag -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/mount.nfs -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/pam_timestamp_check -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/unix_chkpwd -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+-a always,exit -F path=/usr/sbin/userhelper -F perm=x -F auid>=1000 -F auid!=unset -k privileged
+
+# Отслеживание неудачных попыток доступа к файлам
+-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
+-a always,exit -F arch=b64 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
+-a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EACCES -F auid>=1000 -F auid!=unset -k access
+-a always,exit -F arch=b32 -S creat,open,openat,truncate,ftruncate -F exit=-EPERM -F auid>=1000 -F auid!=unset -k access
+
+# Отслеживание событий модификации файлов, содержащих информацию о пользователях и группах
+-w /etc/group -p wa -k identity
+-w /etc/passwd -p wa -k identity
+-w /etc/gshadow -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/security/opasswd -p wa -k identity
+
+# Отслеживание событий попыток модификции пользовательких аккаунтов
+-w /usr/sbin/groupadd -p x -k identity
+-w /usr/sbin/groupmod -p x -k identity
+-w /usr/sbin/addgroup -p x -k identity
+-w /usr/sbin/useradd -p x -k identity
+-w /usr/sbin/usermod -p x -k identity
+-w /usr/sbin/adduser -p x -k identity
+
+# Отслеживание изменений режима доступа к файлам и директориям а так же измнений их владельцев
+-a always,exit -F arch=b64 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b64 -S chown,fchown,lchown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b32 -S chmod,fchmod,fchmodat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b32 -S lchown,fchown,chown,fchownat -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b64 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
+-a always,exit -F arch=b32 -S setxattr,lsetxattr,fsetxattr,removexattr,lremovexattr,fremovexattr -F auid>=1000 -F auid!=unset -F key=perm_mod
+
+# Отслеживание событий подключения файловых систем (события монтирования)
+-a always,exit -F arch=b64 -S mount -F auid>=1000 -F auid!=unset -k mounts
+-a always,exit -F arch=b32 -S mount -F auid>=1000 -F auid!=unset -k mounts
+
+# Отслеживание событий иницирования подключений/сессий. Ведется через отслеживание изменений в специальных файлах.
+-w /var/run/utmp -p wa -k session
+-w /var/log/wtmp -p wa -k session
+-w /var/log/btmp -p wa -k session
+
+# Отслеживание событий авторизаций (входа) пользователей в системе и их выхода.
+-w /var/log/lastlog -p wa -k logins
+-w /var/run/faillock -p wa -k logins
+
+# Отслеживание событий, связанных с удалением или переименованием файлов.
+-a always,exit -F arch=b64 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+-a always,exit -F arch=b32 -S unlink,unlinkat,rename,renameat -F auid>=1000 -F auid!=unset -k delete
+
+# Отслеживание изменений в конфигурации системы мандатного контроля доступа SELinux
+-w /etc/selinux -p wa -k MAC_policy
+-w /usr/share/selinux -p wa -k MAC_policy
+
+# Отслеживание событий изменения SELinux контекста файлов и директорий
+-a always,exit -F path=/usr/bin/chcon -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+
+# Отслеживание событий изменений списков контроля доступа для файлов и директорий
+-a always,exit -F path=/usr/bin/setfacl -F perm=x -F auid>=1000 -F auid!=unset -k perm_chng
+
+# Отслеживание событий изменений списков контроля доступа для файлов и директорий
+-a always,exit -F path=/usr/bin/chacl -F perm=x -F auid>=1000 -F auid!=unset -k priv_cmd
+
+# Отслеживание событий загрузки/выгрузки модулей ядра
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module,create_module,query_module -F auid>=1000 -F auid!=unset -k kernel_modules
+-a always,exit -F path=/usr/bin/kmod -F perm=x -F auid>=1000 -F auid!=unset -k kernel_modules
+-w /etc/modprobe.conf -p wa -k kernel_modules
+
+# Отслеживание действий, связанных с установкой ПО
+-a always,exit -F perm=x -F path=/usr/bin/dnf-3 -F key=software_installer
+-a always,exit -F perm=x -F path=/usr/bin/yum -F key=software_installer
+-a always,exit -F perm=x -F path=/usr/bin/pip -F key=software_installer
+-a always,exit -F perm=x -F path=/usr/bin/npm -F key=software_installer
+-a always,exit -F perm=x -F path=/usr/bin/cpan -F key=software_installer
+-a always,exit -F perm=x -F path=/usr/bin/gem -F key=software_installer
+-a always,exit -F perm=x -F path=/usr/bin/luarocks -F key=software_installer
+
+# Отслеживание использования инструментов управления сетью
+-a always,exit -F perm=x -F path=/sbin/ip -F key=netutils
+-a always,exit -F perm=x -F path=/bin/nmcli -F key=netutils
+-a always,exit -F perm=x -F path=/bin/nmtui -F key=netutils
+-a always,exit -F perm=x -F path=/sbin/iptables -F key=netutils
+-a always,exit -F perm=x -F path=/sbin/ip6tables -F key=netutils
+-a always,exit -F perm=x -F path=/sbin/ifconfig -F key=netutils
+-a always,exit -F perm=x -F path=/sbin/arptables -F key=netutils
+-a always,exit -F perm=x -F path=/sbin/ebtables -F key=netutils
+-a always,exit -F perm=x -F path=/sbin/nft -F key=netutils
+-a always,exit -F perm=x -F path=/bin/firewall-cmd -F key=netutils
+
+# Отслеживание изменений конфигурации оболочки
+-w /etc/profile.d/ -k shell_cfg
+-w /etc/profile -k shell_cfg
+-w /etc/shells -k shell_cfg
+-w /etc/bashrc -k shell_cfg
+-w /etc/csh.cshrc -k shell_cfg
+-w /etc/csh.login -k shell_cfg
+
+# Отслеживание пользовательских вызовов командной строки
+# sudo
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid>=1000 -F auid!=4294967295 -F key=sudo_cmd
+-a always,exit -F arch=b32 -S execve -F euid=0 -F auid>=1000 -F auid!=-1 -F key=sudo_cmd
+
+# user
+-a always,exit -F arch=b64 -S execve -F euid!=0 -F auid>=1000 -F auid!=-1 -F key=user_cmd
+-a always,exit -F arch=b32 -S execve -F euid!=0 -F auid>=1000 -F auid!=-1 -F key=user_cmd
+
+# root
+-a always,exit -F arch=b64 -S execve -F euid=0 -F auid=0 -F auid!=-1 -F key=sudo_cmd
+-a always,exit -F arch=b32 -S execve -F euid=0 -F auid=0 -F auid!=-1 -F key=sudo_cmd
+
+## Отслеживание изменений /etc
+-w /etc/ -p wa -k system_config
+
+## Отслеживание systemd
+-a always,exit -F perm=x -F path=/bin/systemctl -F key=systemd_ops

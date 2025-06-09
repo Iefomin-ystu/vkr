@@ -1,0 +1,43 @@
+---
+# tasks file for linux_configure_lldp
+- name: Step 1 - Gather the package facts
+  timeout: 30
+  throttle: 600
+  ansible.builtin.package_facts:
+    manager: "{{ linux_configure_lldp_package_manager }}"
+
+- name: Step 2 - Install lldpd
+  ansible.builtin.package:
+    name: lldpd
+    use: "{{ linux_configure_lldp_package_manager }}"
+    state: present
+
+- name: Step 3 - Start and Enable lldpd
+  timeout: 30
+  throttle: 600
+  ansible.builtin.systemd:
+    name: lldpd
+    state: started
+    enabled: true
+
+- name: Step 4 - Stop and disable lldpad if exist
+  when: "'lldpad' in ansible_facts.packages"
+  timeout: 30
+  throttle: 600
+  ansible.builtin.systemd:
+    name: lldpad
+    state: stopped
+
+- name: Step 5 - Remove lldpad if exist
+  when: "'lldpad' in ansible_facts.packages"
+  ansible.builtin.package:
+    name: lldpad
+    use: "{{ linux_configure_lldp_package_manager }}"
+    state: absent
+  register: __linux_configure_lldp_lldpad_deleted
+
+- name: Step 6 - Reread systemd units configs
+  when: __linux_configure_lldp_lldpad_deleted is changed
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  changed_when: true

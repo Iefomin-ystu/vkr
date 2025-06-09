@@ -1,0 +1,141 @@
+---
+# tasks file for linux_configure_oomd
+
+# Получение конфига граб, из которого нас интересует третья строчка
+# args="ro crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=rhel/root audit_backlog_limit=8192 psi=1 audit=1"
+- name: Configure systemd-oomd - Parse grub conf
+  ansible.builtin.command: /usr/sbin/grubby --info=ALL
+  register: __oomd_grub_conf
+  changed_when: __oomd_grub_conf.rc != 0
+
+# Добавление параметров ядра для работы PSI
+- name: Configure systemd-oomd - enable PSI in kernel arguments  # noqa no-changed-when
+  ansible.builtin.command: /usr/sbin/grubby --update-kernel=ALL --args='psi=1'
+  register: __oomd_enable_psi_in_kernel
+  failed_when: __oomd_enable_psi_in_kernel.rc != 0
+
+# Из переменной __oomd_grub_conf достаём список строчек по ключу 'stdout_lines'
+# stdout_lines:
+#   - index=0
+#   - kernel="/boot/vmlinuz-5.14.0-427.16.1.el9_4.x86_64"
+#   - args="ro crashkernel=1G-4G:192M,4G-64G:256M,64G-:512M rd.lvm.lv=rhel/root audit_backlog_limit=8192 audit=1 psi=1"
+# ...
+# Из этого списка берём третий элемент (индексация с нуля)
+# Слайсами выбираем содержание в скобках (с 6 индекса по предпоследний чтобы исключить ковычки)
+# Аналогично для переменной _oomd_new_args, но только по ключу 'cmd', ковычек тут уже нет.
+# cmd:
+#   - /usr/sbin/grubby
+#   - --update-kernel=ALL
+#   - --args=psi=1 audit=2 ... ...
+# Применяем фильтр split для разделения аргументов через пробелы в списки
+- name: Grub - Set variable '_oomd_existing_grub_args' and '_oomd_new_args'
+  ansible.builtin.set_fact:
+    _oomd_existing_grub_args: "{{ __oomd_grub_conf['stdout_lines'][2][6 : __oomd_grub_conf['stdout_lines'][2] | length - 1].split() }}"
+    _oomd_new_args: "{{ __oomd_enable_psi_in_kernel['cmd'][2][7:].split() }}"
+
+# Логическая переменная, используемая при принятии решения о ребуте хоста
+# Фильтр difference вернёт значения первого списка, которые не встречаются во втором
+# То есть, если аргументы не переопределялись, то значение _oomd_has_new_args = false и ребут не нужен
+- name: Grub - Set variable '_oomd_has_new_args'
+  ansible.builtin.set_fact:
+    _oomd_has_new_args: "{{ (_oomd_new_args | difference(_oomd_existing_grub_args)) | length != 0 }}"
+
+# Перезапуск сервера, если передан параметр oomd_server_reboot == true и принимаются новые аргументы ядра
+- name: Configure systemd-oomd - Reboot server
+  when: oomd_server_reboot is sameas true and _oomd_has_new_args
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ oomd_reboot_timeout }}"
+    post_reboot_delay: 30
+
+# Проверка на существования файла /proc/pressure/memory = psi включен
+- name: Configure systemd-oomd - Check if PSI enabled in runtime
+  ansible.builtin.stat:
+    path: /proc/pressure/memory
+  register: __psi_enabled
+
+# Падаем, если PSI не включен
+- name: Configure systemd-oomd - Fail if PSI not enabled
+  when: not __psi_enabled.stat.exists
+  ansible.builtin.fail:
+    msg: >-
+      "Error. PSI not enabled, file=\"/proc/pressure/memory\" not exist.
+      You need to reboot server manually or rerun role with \"oomd_server_reboot=true\" variable."
+
+# Установка systemd-oomd
+- name: Configure systemd-oomd - Install systemd-oomd package
+  ansible.builtin.dnf:
+    name: systemd-oomd
+    state: present
+
+# Создание директории для конфигурирования сервиса systemd-oomd
+- name: Configure systemd-oomd - Create config directory
+  throttle: 10
+  timeout: 600
+  ansible.builtin.file:
+    path: /etc/systemd/oomd.conf.d/
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+# Добавление конфигурации изменение memory pressure duration в oomd для systemd сервисов
+- name: Configure systemd-oomd - Add systemd-oomd config
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: oomd.conf.d/oomd.conf
+    dest: /etc/systemd/oomd.conf.d/oomd.conf
+    owner: root
+    group: root
+    mode: '0644'
+  register: __systemd_oomd_config
+
+# Создание директории для конфигурирования всех сервисов
+- name: Configure systemd-oomd - Create general slice directory
+  throttle: 10
+  timeout: 600
+  ansible.builtin.file:
+    path: /etc/systemd/system/-.slice.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+# Добавление конфигурации включения oomd для systemd сервисов
+- name: Configure systemd-oomd - Add systemd-oomd config for root slice
+  throttle: 10
+  timeout: 600
+  ansible.builtin.copy:
+    src: oomd.conf
+    dest: /etc/systemd/system/-.slice.d/oomd.conf
+    owner: root
+    group: root
+    mode: '0644'
+  register: __root_slice_config
+
+# Перечитывание конфигурации systemd при изменении конфигурации слайса
+- name: Configure systemd-oomd - Add systemd-oomd config for root slice
+  when: __root_slice_config.changed
+  throttle: 10
+  timeout: 600
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+# Перезапуск службы systemd-oomd, если изменен конфиг
+- name: Configure systemd-oomd - Restart systemd-oomd service
+  when: __systemd_oomd_config.changed
+  throttle: 10
+  timeout: 600
+  ansible.builtin.systemd:
+    name: systemd-oomd
+    state: restarted
+    enabled: true
+
+# Добавление службы systemd-oomd в автозагрузку и запуск
+- name: Configure systemd-oomd - Start and enable systemd-oomd service
+  throttle: 10
+  timeout: 600
+  ansible.builtin.systemd:
+    name: systemd-oomd
+    state: started
+    enabled: true

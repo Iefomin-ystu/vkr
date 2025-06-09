@@ -1,0 +1,14 @@
+# ======================= #
+#                         #
+# ! STOP ! STOP ! STOP !  #
+#     Managed by AWX:     #
+# tensor.linux collection #
+#                         #
+# ======================= #
+
+# Добавлено по задаче: https://online.sbis.ru/opendoc.html?guid=c80bf5b6-84b9-41ec-8a3a-5de4cbe31435
+
+####### Исключения #######
+# Не мониторим активность VMware Tools
+-a exit,never -F arch=b32 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2
+-a exit,never -F arch=b64 -S fork -F success=0 -F path=/usr/lib/vmware-tools -F subj_type=initrc_t -F exit=-2

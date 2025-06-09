@@ -1,0 +1,101 @@
+---
+# tasks file for linux_configure_openssh
+ # 1. Сбор фактов хостов
+- name: Step 1 - Gather specified facts
+  ansible.builtin.setup:
+    gather_timeout: 30
+    gather_subset:
+      - '!all'
+      - '!min'
+      - 'distribution_major_version'
+      - 'architecture'
+    filter:
+      - ansible_distribution
+      - ansible_distribution_major_version
+  register: __linux_configure_openssh_host_facts
+
+# 2. Создание переменных под название дистрибутива и его версии
+- name: Step 2 - Set OS distrib and version vars
+  ansible.builtin.set_fact:
+    __linux_configure_openssh_host_OS_name: "{{ __linux_configure_openssh_host_facts['ansible_facts']['ansible_distribution'] }}"
+    __linux_configure_openssh_host_OS_version: "{{ __linux_configure_openssh_host_facts['ansible_facts']['ansible_distribution_major_version'] }}"
+
+# 3. Проверяем есть ли данный хост в словаре доступных дистрибутивов
+- name: Step 3 - Check is OS supported
+  when: (
+    __linux_configure_openssh_host_OS_name not in linux_configure_openssh__os or
+    __linux_configure_openssh_host_OS_version not in linux_configure_openssh__os[__linux_configure_openssh_host_OS_name]
+    )
+  ansible.builtin.fail:
+    msg: >
+      {% if __linux_configure_openssh_host_OS_name not in linux_configure_openssh__os %}
+        {{ __linux_configure_openssh_host_OS_name }} distributive is not supported
+      {% else %}
+        {{ __linux_configure_openssh_host_OS_name }} {{ __linux_configure_openssh_host_OS_version }} is not supported
+      {% endif %}
+
+# 4. Установка OpenSSH
+- name: Step 4 - Install OpenSSH
+  ansible.builtin.package:
+    name: openssh
+    state: present
+
+# 5. Старт и автозагрузка SSHD
+- name: Step 5 - Start and enable SSHD
+  timeout: 10
+  throttle: 600
+  ansible.builtin.systemd:
+    name: sshd
+    state: started
+    enabled: true
+
+# 6. Замена конфига sshd_config, создание backup прошлого конфига, рестарт
+- name: Step 6 - Change sshd_config
+  timeout: 10
+  throttle: 600
+  ansible.builtin.template:
+    src: "{{ linux_configure_openssh__os[__linux_configure_openssh_host_OS_name][__linux_configure_openssh_host_OS_version] }}"
+    dest: "{{ linux_configure_openssh__sshd_dest[__linux_configure_openssh_host_OS_name][__linux_configure_openssh_host_OS_version] }}"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: __linux_configure_openssh_change_sshd_config_result
+
+# 7. Применяем новую конфигурацию sshd_config
+- name: Step 7 - Apply new sshd_config
+  when: __linux_configure_openssh_change_sshd_config_result is changed
+  block:
+    - name: Restart SSH daemon
+      timeout: 10
+      throttle: 600
+      ansible.builtin.systemd:
+        name: sshd
+        state: restarted
+# 7 Отменяем изменения при ошибке
+  rescue:
+  # 7.1 Возвращаем старый конфиг
+    - name: Step 7.2 - Return old sshd_config
+      throttle: 10
+      timeout: 600
+      ansible.builtin.copy:
+        remote_src: true
+        src: "{{ __linux_configure_openssh_change_sshd_config_result['backup_file'] }}"
+        dest: "{{ linux_configure_openssh__sshd_dest }}"
+        mode: '0644'
+  # 7.2 Удаляем бэкап старого конфига
+    - name: Step 7.2 - Delete old sshd_config backup
+      ansible.builtin.file:
+        path: "{{ __linux_configure_openssh_change_sshd_config_result['backup_file'] }}"
+        state: absent
+  # 7.3 Перезапуск sshd
+    - name: Step 7.3 - Restart SSHD
+      timeout: 10
+      throttle: 600
+      ansible.builtin.systemd:
+        name: sshd
+        state: restarted
+  # 7.4 Вывод конфига содержащего ошибки
+    - name: Step 7.4 - Fail if sshd_config is broken
+      ansible.builtin.fail:
+        msg: "Failed to apply sshd_config for {{ __linux_configure_openssh_host_OS_name }} {{ __linux_configure_openssh_host_OS_version }}"

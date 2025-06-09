@@ -1,0 +1,13 @@
+argument_specs:
+  main:
+    short_description: The main options linux_configure_lldp role
+    options:
+      linux_configure_lldp_package_manager:
+        choices:
+          - yum
+          - dnf
+          - apt
+          - auto
+        type: "str"
+        required: false
+        description: "Имя пакетного менеджера"

@@ -1,0 +1,4 @@
+# Clean cache: centos/redhat 8
+- name: Clean cache - centos/redhat 8
+  ansible.builtin.dnf:
+    update_cache: true

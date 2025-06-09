@@ -1,0 +1,5 @@
+---
+# tasks file for RedHat 8
+- name: Include "clean_yum_cache_centos{{ os_distrib_ver }}.yml"
+  ansible.builtin.include_tasks:
+    file: "clean_yum_cache_centos{{ os_distrib_ver }}.yml"
