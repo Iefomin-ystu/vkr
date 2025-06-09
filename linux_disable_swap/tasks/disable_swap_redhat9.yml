@@ -1,0 +1,76 @@
+---
+# tasks file for RedHat 9
+# Disable swap centos/redhat 9: Отключение swap
+- name: Disable swap centos/redhat 9 - disable swap
+  ansible.builtin.command: /usr/sbin/swapoff -a
+  register: swapoff
+  changed_when: "swapoff.rc == 0"
+  failed_when: "swapoff.rc != 0"
+
+# Disable swap centos/redhat 9: Отмонтирование swap
+- name: Disable swap centos/redhat 9 - unmount swap
+  ansible.posix.mount:
+    path: "{{ swap_path }}"
+    fstype: swap
+    state: absent
+  loop:
+    - "swap"
+    - "none"
+  loop_control:
+    loop_var: swap_path
+    label: "{{ swap_path }}"
+
+# Disable swap centos/redhat 9: Находим стандартное ядро, чтобы проверить на наличие swap
+- name: Disable swap centos/redhat 9 - find standard kernel
+  ansible.builtin.command: /usr/sbin/grubby --default-index
+  register: standart_kernel_index
+  changed_when: false
+
+- name: Disable swap centos/redhat 9 - set variable 'kernel_index'
+  ansible.builtin.set_fact:
+    kernel_index: "{{ standart_kernel_index.stdout }}"
+
+- name: Disable swap centos/redhat 9 - check swap enabled
+  ansible.builtin.command: "/usr/sbin/grubby --info={{ kernel_index }}"
+  register: kernel_args
+  changed_when: false
+
+- name: Remove kernel args if swap is enabled
+  block:
+    - name: Disable swap centos/redhat 9 - form kernel args to remove
+      ansible.builtin.set_fact:
+        swap_lv_name: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.swap.vg }}/swap"
+        swap_dev_mapper: "/dev/mapper/{{ vm_facts.ansible_facts.ansible_lvm.lvs.swap.vg }}-swap"
+
+    - name: Disable swap centos/redhat 9 - remove swap
+      ansible.builtin.command: "/usr/sbin/grubby --update-kernel=ALL --remove-args='resume={{ swap_dev_mapper }} rd.lvm.lv={{ swap_lv_name }}'"
+      register: swap_removal_result
+      changed_when: swap_removal_result.rc == 0
+      failed_when: swap_removal_result.rc != 0
+  when: '"swap" in kernel_args.stdout'
+
+# Disable swap centos/redhat 9: Удаление Logacal Volume из под swap
+- name: Disable swap centos/redhat 9 - delete lvm swap
+  community.general.lvol:
+    vg: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.swap.vg }}"
+    lv: swap
+    state: absent
+    force: true
+  when: vm_facts.ansible_facts.ansible_lvm.lvs.swap is defined
+  register: disable_swap_delete_lvm
+
+# Disable swap centos/redhat 9: Расширение Logical Volume для root на освободившийся объем
+- name: Disable swap centos/redhat 9 - extend lvm root  # noqa no-handler
+  community.general.lvol:
+    vg: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.root.vg }}"
+    lv: root
+    size: +100%FREE
+  when: disable_swap_delete_lvm.changed
+
+# Disable swap centos/redhat 9: Расширение файловой системы для root
+- name: Disable swap centos/redhat 9 - extend fs root  # noqa no-handler
+  community.general.filesystem:
+    resizefs: true
+    dev: "{{ vm_facts.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='device') | list | first }}"
+    fstype: "{{ vm_facts.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='fstype') | list | first }}"
+  when: disable_swap_delete_lvm.changed

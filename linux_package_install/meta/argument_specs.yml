@@ -1,0 +1,12 @@
+argument_specs:
+  main:
+    short_description: The main options linux_package_install role
+    options:
+      linux_package_install_base_pkg:
+        type: "dict"
+        required: false
+        description: "Список из основных пакетов"
+      linux_package_install_additional_package:
+        type: "list"
+        required: false
+        description: "Список из доп пакетов"

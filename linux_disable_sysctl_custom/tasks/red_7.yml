@@ -1,0 +1,5 @@
+---
+# linux: загрузка задач для Centos 8
+- name: Include "centos_8.yml"
+  ansible.builtin.include_tasks:
+    file: "centos_8.yml"

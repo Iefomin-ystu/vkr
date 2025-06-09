@@ -1,0 +1,51 @@
+---
+# tasks file for linux
+# linux: Cбор фактов по серверу
+- name: Get facts
+  ansible.builtin.setup:
+    gather_timeout: 30
+  delegate_facts: true
+  become: true
+  register: vm_facts
+
+# linux: Имя операционной системы
+# vm_facts.ansible_facts.ansible_distribution == "RedHat"
+- name: OS - Set distribution name
+  ansible.builtin.set_fact:
+    os_distrib_name: "{{ vm_facts.ansible_facts.ansible_distribution | lower }}"
+
+# linux: Мажорная версия операционной системы
+# vm_facts.ansible_facts.ansible_distribution_major_version == "7"
+- name: OS - Set distribution major version
+  ansible.builtin.set_fact:
+    os_distrib_ver: "{{ vm_facts.ansible_facts.ansible_distribution_major_version }}"
+
+# linux: Минорная версия операционной системы
+# vm_facts.ansible_facts.ansible_distribution_version.split('.')[1] == "6"
+- name: OS - Set distribution minor version
+  ansible.builtin.set_fact:
+    os_distrib_ver_minor: "{{ vm_facts.ansible_facts.ansible_distribution_version.split('.')[1] }}"
+  when:
+    os_distrib_name == 'centos' and os_distrib_ver == '7'
+    or
+    os_distrib_name == 'redhat' and os_distrib_ver == '7'
+
+# linux: Формирование переменной для выбора сценария
+- name: Set variable 'os_major'
+  ansible.builtin.set_fact:
+    os_major: "{{ os_distrib_name }}{{ os_distrib_ver }}"
+
+# linux: Проверяем наличие swap
+- name: OS - Get info about swap
+  ansible.builtin.command: /usr/sbin/swapon -s
+  register: chkswap
+  changed_when: "chkswap.rc != 0"
+
+# linux: Загрузка нужного сценария
+- name: Include "disable_swap_{{ os_major }}.yml"
+  ansible.builtin.include_tasks:
+    file: "disable_swap_{{ os_major }}.yml"
+  when:
+    chkswap.stdout | string | length > 0
+    or
+    vm_facts.ansible_facts.ansible_lvm.lvs.swap is defined

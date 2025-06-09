@@ -1,0 +1,30 @@
+- name: RHSM - EL OS with SCA
+  when: rhsm_attach__sca in __rhsm_attach_rhsm_status.stdout
+  block:
+    - name: Save repo_id variables
+      ansible.builtin.command:
+        argv:
+          - dnf
+          - repolist
+          - all
+      register: __rhsm_attach_repo_output
+      changed_when: false
+      failed_when: __rhsm_attach_repo_output.rc != 0
+
+    - name: Filter relevant repo_ids
+      ansible.builtin.set_fact:
+        _rhsm_attach_repo_ids:
+          "{{ __rhsm_attach_repo_output.stdout_lines
+            | select('search', _rhsm_attach_subscription)
+            | map('regex_replace', '\\s+(enabled|disabled)$', '')
+            | list
+          }}"
+
+    - name: RHSM - Enable repositories
+      community.general.rhsm_repository:
+        name: "{{ _rhsm_attach_repo_id }}"
+        state: enabled
+      loop: "{{ _rhsm_attach_repo_ids }}"
+      loop_control:
+        loop_var: _rhsm_attach_repo_id
+        label: _rhsm_attach_item

@@ -1,0 +1,4 @@
+# linux: загрузка задач для Centos
+- name: Include "centos_{{ os_distrib_ver }}.yml"
+  ansible.builtin.include_tasks:
+    file: "centos_{{ os_distrib_ver }}.yml"

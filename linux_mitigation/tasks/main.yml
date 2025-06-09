@@ -1,0 +1,22 @@
+---
+
+- name: Step 1 - Add spec_rstack_overflow=off
+  # устанавливаем аргумент spec_rstack_overflow=off
+  when: linux_mitigation_cve_2023_20569_state == 'absent'
+  ansible.builtin.command: /usr/sbin/grubby --update-kernel=ALL --args='spec_rstack_overflow=off'
+  register: __linux_mitigation
+  changed_when: __linux_mitigation.rc != 0
+
+- name: Step 2 - Remove spec_rstack_overflow=off
+  # удаление аргумента spec_rstack_overflow=off
+  when: linux_mitigation_cve_2023_20569_state == 'present'
+  ansible.builtin.command: /usr/sbin/grubby --remove-args="spec_rstack_overflow" --update-kernel=ALL
+  register: __linux_mitigation
+  changed_when: __linux_mitigation.rc != 0
+
+- name: Step 3 - Reboot host to accept changes
+  # перезапуск хоста для принятия изменений в силу
+  when: linux_mitigation_reboot is true
+  ansible.builtin.reboot:
+    reboot_timeout: 300
+    post_reboot_delay: 30

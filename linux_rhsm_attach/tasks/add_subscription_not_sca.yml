@@ -1,0 +1,39 @@
+- name: RHSM - Check whether subscription is consumed
+  ansible.builtin.command:
+    argv:
+      - subscription-manager
+      - list
+      - --consumed
+      - --pool-only
+      - --matches
+      - "{{ _rhsm_attach_subscription }}"
+  register: __rhsm_attach_consumed_subscriptions
+  changed_when: false
+  failed_when: __rhsm_attach_consumed_subscriptions.rc != 0
+
+- name: RHSM - Attach subscription if it's not consumed
+  when: __rhsm_attach_consumed_subscriptions.stdout | length == 0
+  block:
+    - name: RHSM - Check whether subscription is available
+      ansible.builtin.command:
+        argv:
+          - subscription-manager
+          - list
+          - --available
+          - --pool-only
+          - --matches
+          - "{{ _rhsm_attach_subscription }}"
+      register: __rhsm_attach_subscription_available
+      changed_when: false
+      failed_when: __rhsm_attach_subscription_available.rc != 0
+
+    - name: RHSM - "Attach subscription '{{ _rhsm_attach_subscription }}'"
+      when:
+        - __rhsm_attach_subscription_available.stdout | length > 0
+      ansible.builtin.command:
+        argv:
+          - subscription-manager
+          - attach
+          - --pool
+          - "{{ __rhsm_attach_subscription_available.stdout }}"
+      changed_when: true

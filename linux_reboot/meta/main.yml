@@ -1,0 +1,21 @@
+---
+galaxy_info:
+  role_name: linux_reboot
+  author: Automation Team (https://online.sbis.ru/department/7dacbc04-f8b7-44c8-8707-3863d27493ba/)
+  description: Перезапуск сервера.
+  company: Tensor Company Ltd.
+  license: GPL-2.0-or-later
+  min_ansible_version: "2.9"
+  platforms:
+    - name: EL
+      versions:
+        - "7"
+        - "8"
+        - "9"
+  galaxy_tags:
+    - tensor
+    - linux
+    - centos
+    - almalinux
+    - redos
+dependencies: []

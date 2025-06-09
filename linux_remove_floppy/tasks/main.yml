@@ -1,0 +1,46 @@
+---
+# tasks file for remove_floppy
+# linux: Cбор фактов по серверу
+- name: Get facts
+  ansible.builtin.setup:
+    gather_timeout: 30
+  delegate_facts: true
+  become: true
+  register: vm_facts
+
+# linux: Имя операционной системы
+# vm_facts.ansible_facts.ansible_distribution == "RedHat"
+- name: OS - Set distribution name
+  ansible.builtin.set_fact:
+    os_distrib_name: "{{ vm_facts.ansible_facts.ansible_distribution | lower }}"
+
+# linux: Мажорная версия операционной системы
+# vm_facts.ansible_facts.ansible_distribution_major_version == "7"
+- name: OS - Set distribution major version
+  ansible.builtin.set_fact:
+    os_distrib_ver: "{{ vm_facts.ansible_facts.ansible_distribution_major_version }}"
+
+# Удаляем fd0, если существует
+- name: Disable floppy - Delete floppy from kernel if exists
+  block:
+    # Заносим floppy в kernel blacklist
+    - name: Disable floppy - Blacklist floppy kernel module
+      community.general.kernel_blacklist:
+        blacklist_file: /etc/modprobe.d/blacklist-floppy.conf
+        name: floppy
+        state: present
+
+    # Удаляем модуль floppy из kernel
+    - name: Disable floppy - Remove floppy module from kernel
+      community.general.modprobe:
+        name: floppy
+        state: absent
+
+    # Пересборка initramfs
+    - name: Disable floppy - Dracut regenerate
+      ansible.builtin.command: /usr/bin/dracut --force --regenerate-all
+      register: dracut
+      changed_when: "dracut.rc != 2"
+  when:
+    - vm_facts.ansible_facts.ansible_devices.fd0 is defined
+    - (os_distrib_name == 'centos' or os_distrib_name == 'redhat') and (os_distrib_ver == '7' or os_distrib_ver == '8' or os_distrib_ver == '9')

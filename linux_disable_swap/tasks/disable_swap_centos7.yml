@@ -1,0 +1,107 @@
+---
+# tasks file for disable swap
+# Disable swap centos/redhat 7: Отключение swap
+- name: Disable swap centos/redhat 7 - disable swap
+  ansible.builtin.command: /usr/sbin/swapoff -a
+  register: swapoff
+  changed_when: "swapoff.rc == 0"
+  failed_when: "swapoff.rc != 0"
+
+# Disable swap centos/redhat 7: Отмонтирование swap
+- name: Disable swap centos/redhat 7 - unmount swap
+  ansible.posix.mount:
+    path: "{{ swap_path }}"
+    fstype: swap
+    state: absent
+  loop:
+    - "swap"
+    - "none"
+  loop_control:
+    loop_var: swap_path
+    label: "{{ swap_path }}"
+
+# Disable swap centos/redhat 7: Удаление swap из конфигурации загрузчика
+- name: Disable swap centos/redhat 7 - grub reconfig
+  ansible.builtin.replace:
+    path: /etc/default/grub
+    regexp: "[a-zA-Z0-9_=.\\/-]+swap "
+    replace: ""
+    backup: true
+
+# Disable swap centos/redhat 7: Поиск конфигурации загрузчика (default)
+- name: Disable swap centos/redhat 7 - find /boot/grub2/grub.cfg
+  ansible.builtin.stat:
+    path: /boot/grub2/grub.cfg
+  register: boot_grub2
+
+# Disable swap centos/redhat 7: Поиск конфигурации загрузчика (RedHat - UEFI)
+- name: Disable swap centos/redhat 7 - find /boot/efi/EFI/redhat/grub.cfg
+  ansible.builtin.stat:
+    path: /boot/efi/EFI/redhat/grub.cfg
+  register: boot_efi_efi_redhat
+
+# Disable swap centos/redhat 7: Поиск конфигурации загрузчика (CentOS - UEFI)
+- name: Disable swap centos/redhat 7 - find /boot/efi/EFI/centos/grub.cfg
+  ansible.builtin.stat:
+    path: /boot/efi/EFI/centos/grub.cfg
+  register: boot_efi_efi_centos
+
+# Disable swap centos/redhat 7: Пересборка grub (default)
+- name: Disable swap centos/redhat 7 - grub regenerate (default)
+  ansible.builtin.command: /usr/sbin/grub2-mkconfig -o /boot/grub2/grub.cfg
+  register: grub_reconfig
+  changed_when: "grub_reconfig.rc == 0"
+  failed_when: "grub_reconfig.rc != 0"
+  when:
+    - boot_grub2.stat.exists
+
+# Disable swap centos/redhat 7: Пересборка grub (RedHat - UEFI)
+- name: Disable swap centos/redhat 7 - grub regenerate (RedHat - UEFI)
+  ansible.builtin.command: /usr/sbin/grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg
+  register: grub_reconfig_rh_uefi
+  changed_when: "grub_reconfig_rh_uefi.rc == 0"
+  failed_when: "grub_reconfig_rh_uefi.rc != 0"
+  when:
+    - boot_efi_efi_redhat.stat.exists
+
+# Disable swap centos/redhat 7: Пересборка grub (CentOS - UEFI)
+- name: Disable swap centos/redhat 7 - grub regenerate (CentOS - UEFI)
+  ansible.builtin.command: /usr/sbin/grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
+  register: grub_reconfig_c_uefi
+  changed_when: "grub_reconfig_c_uefi.rc == 0"
+  failed_when: "grub_reconfig_c_uefi.rc != 0"
+  when:
+    - boot_efi_efi_centos.stat.exists
+
+# Disable swap centos/redhat 7: Пересборка initramfs
+- name: Disable swap centos/redhat 7 - dracut regenerate
+  ansible.builtin.command: /usr/bin/dracut --force --regenerate-all
+  register: dracut
+  changed_when: "dracut.rc == 0"
+  failed_when: "dracut.rc != 0"
+
+# Disable swap centos/redhat 7: Удаление Logacal Volume из под swap
+- name: Disable swap centos/redhat 7 - delete lvm swap
+  community.general.lvol:
+    vg: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.swap.vg }}"
+    lv: swap
+    state: absent
+    force: true
+  when: vm_facts.ansible_facts.ansible_lvm.lvs.swap is defined
+  register: disable_swap_delete_lvm
+
+# Disable swap centos/redhat 7: Расширение Logical Volume для root на освободившийся объем
+- name: Disable swap centos/redhat 7 - extend lvm root  # noqa no-handler
+  community.general.lvol:
+    vg: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.root.vg }}"
+    lv: root
+    size: +100%FREE
+  when: disable_swap_delete_lvm.changed
+
+# Disable swap centos/redhat 7: Расширение файловой системы для root
+- name: Disable swap centos/redhat 7 - extend fs root  # noqa no-handler
+  community.general.filesystem:
+    resizefs: true
+    dev: "{{ vm_facts.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='device') | list | first }}"
+    fstype: "{{ vm_facts.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='fstype') | list | first }}"
+  when: disable_swap_delete_lvm.changed

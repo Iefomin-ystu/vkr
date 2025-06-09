@@ -1,0 +1,128 @@
+---
+- name: System - collect service facts
+# 1. Сбор фактов служб linux
+  ansible.builtin.service_facts:
+
+- name: System - Collect package facts
+# 2. Сбор фактов пакетов linux
+  throttle: 10
+  timeout: 600
+  ansible.builtin.package_facts:
+    manager: auto
+
+- name: System - Check ntpd or timesyncd is already running
+# 3. Проверка того, что нет установленных и запущенных служб синхронизации времени кроме chrony
+# Если запущена другая служба, падаем в ошибку, если она просто установлена, идёт дальше
+  when: >
+    - ('ntp' in ansible_facts.packages and ansible_facts.services['ntpd.service']['state'] == 'running') or
+      ('systemd-timesyncd' in ansible_facts.packages and ansible_facts.services['systemd-timesyncd.service']['state'] == 'running')
+  ansible.builtin.fail:
+    msg: "Only chronyd is supported"
+
+- name: System - Install chrony package
+# 4. Установка пакета chrony, если его нет, то поставится.
+  when: "'chrony' not in ansible_facts.packages"
+  ansible.builtin.package:
+    name: chrony
+    state: present
+
+- name: System - Run chronyd
+# 5. Запустить chronyd, если выключен или только что установен
+  ansible.builtin.service:
+    name: chronyd
+    state: started
+    enabled: true
+  throttle: 10
+  timeout: 600
+
+- name: Chronyd - Time sources are valid
+# 6. Проверка корректности списка источников времени (непустой, валидный IP)
+  when: linux_ntp_time_sources_list | length != linux_ntp_time_sources_list | ansible.utils.ipaddr | length
+  ansible.builtin.fail:
+    msg: "Check your list of time sources"
+
+- name: Chrony.conf - copy to remote hosts
+# 7. Копируем конфиг на удалённые хосты и создаём бэкап конфига
+  throttle: 10
+  timeout: 600
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: "{{ linux_ntp__conf_path }}"
+    backup: true
+    mode: '0644'
+  register: __linux_ntp_upload_result
+
+- name: Chronyd - apply new config file
+# 8.1. Блок из двух tasks, который будет выполняться только тогда, когда конфиг chrony.conf изменён
+# (на удалённом хосте отличен от копируемого)
+# Если изменений не было сразу переходим к task "Chronyd - get time sources status"
+  when: __linux_ntp_upload_result is changed
+  block:
+    - name: Chronyd - restart service
+    # 8.1.1. Перезапускаем службу и применяем изменения нового конфига
+      throttle: 10
+      timeout: 600
+      ansible.builtin.systemd:
+        name: chronyd
+        state: restarted
+
+    - name: System - wait for chrony sync
+    # 8.1.2. Ждём, пока chronyd синхрониизируется с источниками времени и переходим к Chronyd - get time sources status
+      ansible.builtin.wait_for:
+        timeout: "{{ linux_ntp__timeout }}"
+
+  rescue:
+  # 8.2. Если в блоке выше произошла ошибка при рестарте сервиса, то откатываем изменения
+    - name: System - return to state before fail
+      block:
+        - name: System - delete copied file
+        # 8.2.1. Удаляем скопированную конфигурацию chrony.conf, которая вызвала ошибку при рестарте
+          ansible.builtin.file:
+            path: "{{ linux_ntp__conf_path }}"
+            state: absent
+
+        - name: System - rename backup config
+        # 8.2.2. Переименовываем бэкап (исходный конфиг) в "chrony.conf"
+          throttle: 10
+          timeout: 600
+          ansible.builtin.copy:
+            remote_src: true
+            src: "{{ __linux_ntp_upload_result['backup_file'] }}"
+            dest: "{{ linux_ntp__conf_path }}"
+            mode: '0644'
+
+        - name: Chronyd - restart service for backup
+        # 8.2.3. Перезапускаем службу chronyd для применения старого конфига (бэкапа)
+          throttle: 10
+          timeout: 600
+          ansible.builtin.systemd:
+            name: chronyd
+            state: restarted
+
+        - name: Chronyd - config file failed
+        # 8.2.4. Сообщаем о неудачном обновлении, просим проверить конфиг на ошибки
+          ansible.builtin.fail:
+            msg: "Chronyd configuration failed. Check chrony.conf file"
+
+- name: Chronyd - Check time sources after update
+# 9. Блок 2 тасок по проверке статуса источников
+  block:
+    - name: Chronyd - get time sources status
+      when: linux_ntp_check_sources
+    # 9.1. Получаем статус источников времени в переменную __linux_ntp_sources_status и проверяем несколько раз
+      ansible.builtin.shell:
+        cmd: set -o pipefail && chronyc -c sources | cut -d "," -f 2
+      register: __linux_ntp_sources_status
+      changed_when: __linux_ntp_sources_status['rc'] != 0
+      retries: 12
+      delay: 5
+      until:
+        - __linux_ntp_sources_status['stdout'].find("?") < 1
+        - __linux_ntp_sources_status['stdout'].find("x") < 1
+        - __linux_ntp_sources_status['stdout'].find("~") < 1
+
+  rescue:
+  # Падаем в failed если за 12 попыток с интервалом в 5 секунд не пропали неудовлетворительные статусы
+    - name: Message of previous task
+      ansible.builtin.fail:
+        msg: "Incorrect status of time sources: {{ __linux_ntp_sources_status['stdout_lines'] }}"

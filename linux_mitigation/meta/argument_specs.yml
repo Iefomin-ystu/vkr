@@ -1,0 +1,15 @@
+argument_specs:
+  main:
+    short_description: The main options linux_mitigation role
+    options:
+      linux_mitigation_cve_2023_20569_state:
+        choices:
+          - absent
+          - present
+        type: str
+        required: false
+        description: "Признак необходимости перезагрузки сервера ролью."
+      linux_mitigation_reboot:
+        type: bool
+        required: false
+        description: "Признак необходимости установить/удалить spec_rstack_overflow=off"

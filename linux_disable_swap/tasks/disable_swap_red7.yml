@@ -1,0 +1,77 @@
+---
+# tasks file for disable swap
+# Disable swap RedOS 7.3: Отключение swap
+- name: Disable swap RedOS 7.3 - disable swap
+  ansible.builtin.command: /usr/sbin/swapoff -a
+  register: swapoff
+  changed_when: "swapoff.rc == 0"
+  failed_when: "swapoff.rc != 0"
+
+# Disable swap RedOS 7.3: Отмонтирование swap
+- name: Disable swap RedOS 7.3 - unmount swap
+  ansible.posix.mount:
+    path: "{{ swap_path }}"
+    fstype: swap
+    state: absent
+  loop:
+    - "swap"
+    - "none"
+  loop_control:
+    loop_var: swap_path
+    label: "{{ swap_path }}"
+
+# Disable swap RedOS 7.3: Удаление swap из конфигурации загрузчика
+- name: Disable swap RedOS 7.3 - grub reconfig
+  ansible.builtin.replace:
+    path: /etc/default/grub
+    regexp: "[a-zA-Z0-9_=.\\/-]+swap "
+    replace: ""
+    backup: true
+
+# Disable swap RedOS 7.3: Поиск конфигурации загрузчика (default)
+- name: Disable swap RedOS 7.3 - find /boot/grub2/grub.cfg
+  ansible.builtin.stat:
+    path: /boot/grub2/grub.cfg
+  register: boot_grub2
+
+# Disable swap RedOS 7.3: Пересборка grub (default)
+- name: Disable swap RedOS 7.3 - grub regenerate (default)
+  ansible.builtin.command: /usr/sbin/grub2-mkconfig -o /boot/grub2/grub.cfg
+  register: grub_reconfig
+  changed_when: "grub_reconfig.rc == 0"
+  failed_when: "grub_reconfig.rc != 0"
+  when:
+    - boot_grub2.stat.exists
+
+# Disable swap RedOS 7.3: Пересборка initramfs
+- name: Disable swap RedOS 7.3 - dracut regenerate
+  ansible.builtin.command: /usr/bin/dracut --force --regenerate-all
+  register: dracut
+  changed_when: "dracut.rc == 0"
+  failed_when: "dracut.rc != 0"
+
+# Disable swap RedOS 7.3: Удаление Logacal Volume из под swap
+- name: Disable swap RedOS 7.3 - delete lvm swap
+  community.general.lvol:
+    vg: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.swap.vg }}"
+    lv: swap
+    state: absent
+    force: true
+  when: vm_facts.ansible_facts.ansible_lvm.lvs.swap is defined
+  register: disable_swap_delete_lvm
+
+# Disable swap RedOS 7.3: Расширение Logical Volume для root на освободившийся объем
+- name: Disable swap RedOS 7.3 - extend lvm root  # noqa no-handler
+  community.general.lvol:
+    vg: "{{ vm_facts.ansible_facts.ansible_lvm.lvs.root.vg }}"
+    lv: root
+    size: +100%FREE
+  when: disable_swap_delete_lvm.changed
+
+# Disable swap RedOS 7.3: Расширение файловой системы для root
+- name: Disable swap RedOS 7.3 - extend fs root  # noqa no-handler
+  community.general.filesystem:
+    resizefs: true
+    dev: "{{ vm_facts.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='device') | list | first }}"
+    fstype: "{{ vm_facts.ansible_facts.ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='fstype') | list | first }}"
+  when: disable_swap_delete_lvm.changed

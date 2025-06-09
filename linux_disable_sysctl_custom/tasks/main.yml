@@ -1,0 +1,21 @@
+---
+# Linux: Сбор фактов по версии ОС
+- name: Linux - get OS facts
+  ansible.builtin.setup:
+    filter: "*distribution*"
+
+# Linux: Имя операционной системы в lowercase
+# ansible_facts.distribution == "RedHat"
+- name: Linux - set distribution name
+  ansible.builtin.set_fact:
+    os_distrib_name: "{{ ansible_facts.distribution | lower }}"
+
+# Linux: Мажорная версия операционной системы
+# ansible_facts.distribution_major_version == "7"
+- name: Linux - set distribution version
+  ansible.builtin.set_fact:
+    os_distrib_ver: "{{ ansible_facts.distribution_major_version }}"
+
+# Linux: загрузка задач в зщависимости от ОС
+- name: Linux - include task by OS
+  ansible.builtin.include_tasks: "{{ os_distrib_name }}_{{ os_distrib_ver }}.yml"

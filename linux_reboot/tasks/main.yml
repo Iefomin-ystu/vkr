@@ -1,0 +1,39 @@
+---
+# tasks file for reboot
+# OS: Переменной reboot_timeout из defaults, если не передается в сценарий
+- name: Set variable 'reboot_timeout' from defaults
+  ansible.builtin.set_fact:
+    linux_reboot_timeout: "{{ linux_reboot_timeout | d(_def_linux_reboot_timeout) }}"
+
+# OS: Переменной post_reboot_delay из defaults, если не передается в сценарий
+- name: Set variable 'post_reboot_delay' from defaults
+  ansible.builtin.set_fact:
+    linux_post_reboot_delay: "{{ linux_post_reboot_delay | d(_def_linux_post_reboot_delay) }}"
+
+# OS: Переменной force из defaults, если не передается в сценарий
+- name: Set variable 'force' from defaults
+  ansible.builtin.set_fact:
+    linux_reboot_force: "{{ linux_reboot_force | d(_def_linux_reboot_force) }}"
+
+- name: OS - Reboot
+  ansible.builtin.reboot:
+    reboot_timeout: "{{ linux_reboot_timeout }}"
+    post_reboot_delay: "{{ linux_post_reboot_delay }}"
+  when:
+    - not linux_reboot_force
+
+- name: OS - Force reboot
+  block:
+    - name: OS - force reboot
+      ansible.builtin.command: reboot --force  # noqa no-changed-when
+      async: 1
+      poll: 0
+
+    - name: OS - Waiting for the server to return
+      ansible.builtin.wait_for_connection:
+        timeout: "{{ linux_reboot_timeout }}"
+        delay: "{{ linux_post_reboot_delay }}"
+        sleep: 5
+        connect_timeout: 5
+  when:
+    - linux_reboot_force

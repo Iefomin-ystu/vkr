@@ -1,0 +1,5 @@
+---
+# defaults file for linux_reboot
+_def_linux_reboot_force: false
+_def_linux_reboot_timeout: 300
+_def_linux_post_reboot_delay: 30

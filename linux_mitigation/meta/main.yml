@@ -1,0 +1,16 @@
+---
+galaxy_info:
+  role_name: linux_mitigation
+  author: I.A. Katyshev <ia.katyshev@tensor.ru>
+  description: Роль для устранения устранения CVE добавлением аргумента загрузки ядра spec_rstack_overflow=off
+  company: Tensor Company Ltd.
+  license: GPL-2.0-or-later
+
+  min_ansible_version: "2.15"
+
+  platforms:
+    - name: EL
+      versions:
+        - "7"
+        - "8"
+        - "9"

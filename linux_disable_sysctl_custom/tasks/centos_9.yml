@@ -1,0 +1,57 @@
+---
+# Linux: поиск всех кастомных настроек sysctl
+- name: Linux - find sysctl configs
+  ansible.builtin.command: /bin/find -L /etc/sysctl.d/  /usr/lib/sysctl.d/ -name '*.conf' -type f -print
+  register: sysctl_conf
+  changed_when: "sysctl_conf.rc != 2"
+
+# Linux: бэкап найденых настроек
+- name: Linux - backup sysctl configs
+  ansible.builtin.copy:
+    src: "{{ conf_file }}"
+    dest: "{{ conf_file }}.bkp"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    remote_src: true
+  loop: "{{ sysctl_conf.stdout_lines }}"
+  loop_control:
+    loop_var: conf_file
+    label: "{{ conf_file }}"
+
+# Linux: удаление всех кастомных настроек sysctl
+- name: Linux - clean sysctl config
+  ansible.builtin.command: /bin/find -L /etc/sysctl.d/  /usr/lib/sysctl.d/ -name '*.conf' -type f -print -delete
+  register: sysctl_conf
+  changed_when: "sysctl_conf.rc != 2"
+
+# Linux: установка пакетов для текущего ядра.
+- name: Linux - update some packages
+  become: true
+  ansible.builtin.yum:
+    name:
+      - initscripts
+      - elfutils-default-yama-scope
+      - systemd
+      - libkcapi
+    state: latest # noqa package-latest comments
+
+# Linux: реинсталл пакетов для возвращения дефолтных конфигов
+- name: Linux - reinstall some packages
+  ansible.builtin.command: /usr/bin/yum reinstall -y initscripts elfutils-default-yama-scope systemd libkcapi centos-stream-release
+  register: yum_reinstall
+  changed_when: "yum_reinstall.rc != 2"
+  args:
+    warn: false
+
+# Linux: применение настроек sysctl
+- name: Linux - sysctl apply settings
+  ansible.builtin.command: /usr/sbin/sysctl --system
+  register: sysctl_apply
+  changed_when: "sysctl_apply.rc != 2"
+
+# Linux: пересобираем ядро с параметрами по умолчанию
+- name: Linux - dracut regenerate
+  ansible.builtin.command: /usr/bin/dracut --force --regenerate-all
+  register: dracut
+  changed_when: "dracut.rc != 2"

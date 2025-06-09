@@ -1,0 +1,45 @@
+---
+- name: Gather specified facts
+# 1. Сбор фактов хостов
+  ansible.builtin.setup:
+    gather_timeout: 30
+    gather_subset:
+      - '!all'
+      - '!min'
+      - 'distribution_major_version'
+      - 'architecture'
+    filter:
+      - ansible_distribution
+      - ansible_distribution_major_version
+  become: true
+  register: __host_facts
+
+- name: Save variables
+# 2. Создание переменных под название дистрибутива и его версии
+  ansible.builtin.set_fact:
+    _host_OS_name: "{{ __host_facts['ansible_facts']['ansible_distribution'] }}"
+    _host_OS__version: "{{ __host_facts['ansible_facts']['ansible_distribution_major_version'] }}"
+
+- name: Check installation possible for OS family
+# 3. Проверяем есть ли данный хост в словаре доступных дистрибутивов
+  when: _host_OS_name not in linux_package_install__base_pkg
+  ansible.builtin.fail:
+    msg: "{{ _host_OS_name }} is not supported OS"
+
+- name: Check installation possible for OS version
+# 4. Проверяем есть ли ОС в словаре доступных версий
+  when: _host_OS__version not in linux_package_install__base_pkg[_host_OS_name]
+  ansible.builtin.fail:
+    msg: "{{ _host_OS__version }} is not supported OS version"
+
+- name: Install base packages
+# 5. Установка пакетов из базового списка base_pkg
+  ansible.builtin.package:
+    name: "{{ linux_package_install__base_pkg[_host_OS_name][_host_OS__version] }}"
+    state: present
+
+- name: Install additional packages
+# 6. Установка доп пакетов
+  ansible.builtin.package:
+    name: "{{ linux_package_install_additional_pkg }}"
+    state: present
